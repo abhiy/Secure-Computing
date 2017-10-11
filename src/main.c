@@ -75,9 +75,11 @@ void getDatabaseUpdated(char buffer[]){
   if(!ok){
     child_pid = fork();
     if(child_pid == 0){
-      char* args[1];
-      args[0] = "./update/update";
+      char* args[] = {"./update/update", (char*)0};
       execv(args[0], args);
+      printf("Failed to start update_svc: %s\n", strerror(errno));
+      printf("Child exiting....\n");
+      exit(0);
     }
     printf("update_svc started with pid %d\n", child_pid);
     sleep(1);
@@ -116,7 +118,7 @@ int readFile(char buffer[], char* arg){
   return nBytes;
 }
 
-void scanViruses(char buffer[], char* result, char* arg, int filesize){
+void scanViruses(char buffer[], char* result, int* offset, char* arg, int filesize){
   printf("Scanning for viruses....\n");
   int ok = checkStatus(scan_svc);
   pid_t child_pid;
@@ -130,7 +132,7 @@ void scanViruses(char buffer[], char* result, char* arg, int filesize){
     printf("scan_svc started with pid %d\n", child_pid);
     sleep(1);
   }
-  int scanSocket, nBytes, offset = 0;
+  int scanSocket, nBytes;
   struct sockaddr_in scanAddr = connectToService(4444, &scanSocket);
   socklen_t scan_addr_size = sizeof scanAddr;
   nBytes = sendto(scanSocket, buffer, filesize, 0, (struct sockaddr *)&scanAddr, scan_addr_size);
@@ -146,10 +148,10 @@ void scanViruses(char buffer[], char* result, char* arg, int filesize){
   }
   else{
     if(buffer[0] == '1'){
-      offset = sprintf(result+offset, "%s - infected\n", arg);
+      *offset += sprintf(result+ *offset, "%s - infected\n", arg);
     }
     else
-      offset = sprintf(result+offset, "%s - clean\n", arg);
+      *offset += sprintf(result+ *offset, "%s - clean\n", arg);
   }
   return;
 }
@@ -157,19 +159,23 @@ void scanViruses(char buffer[], char* result, char* arg, int filesize){
 int main(int argc, char **argv){
   char buffer[512];
   char result[1024];
+  int offset = 0;
 
   int i;
   for(i = 1; i < argc; i++){
     // Get the update service to update the database
+    printf("\n");
     getDatabaseUpdated(buffer);
 
     // Send filename to the file read service
     int filesize = readFile(buffer, argv[i]);
 
     // Scan the file contents for viruses
-    scanViruses(buffer, result, argv[i], filesize);
+    scanViruses(buffer, result, &offset, argv[i], filesize);
     
   }
+  printf("\n***********RESULTS****************\n");
   printf("%s", result);
+  printf("**********************************\n");
   return 0;
 }
