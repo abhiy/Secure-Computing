@@ -5,17 +5,39 @@
 #include <stdlib.h>
 #include <errno.h>
 
-int readFile(char buffer[]){
+void scanForViruses(char* file, char* threatfile, char* scan_result){
+  int i, j, k;
+  for(i = 3; i < strlen(file); i++){
+    for(j = 3; j < strlen(threatfile); j+=3){
+      if(file[i] == threatfile[j]){
+        for(k = 0; k < 4; k++){
+          if(file[i-k] != threatfile[j-k]){
+            break;
+          }
+          else{
+            if(k == 3){
+              scan_result[0] = '1';
+              return;
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+void scanFile(char* file , char* scan_result){
   FILE* fp;
-  fp = fopen(buffer, "r");
+  char threatfile[512];
+  fp = fopen("/home/aby/Sem-1/Security/hw-2/Project/db/threat", "r");
   fseek(fp, 0, SEEK_END);
   long fpsize = ftell(fp);
   fseek(fp, 0, SEEK_SET);  //same as rewind(f);
 
-  fgets(buffer, fpsize, fp);
+  fgets(threatfile, fpsize, fp);
   fclose(fp);
 
-  return fpsize;
+  scanForViruses(file, threatfile, scan_result);
 }
 
 int main(){
@@ -47,6 +69,7 @@ int main(){
 
   char scan_result[1];
   while(1){
+    scan_result[0] = '0';
     // Waits to hear from main service
     nBytes = recvfrom(udpSocket, buffer, 1024, 0, (struct sockaddr *)&serverStorage, &addr_size);
     if(nBytes < 0){
@@ -58,7 +81,7 @@ int main(){
       printf("Received request to scan a file\n");
     }
     //scan_result[0]  = scanFile(buffer);
-    scan_result[0] = '1';
+    scanFile(buffer, scan_result);
     nBytes = sendto(udpSocket, scan_result, 1, 0, (struct sockaddr *)&serverStorage, addr_size);
     if(nBytes < 0){
       printf("Unable to send the scan results to the main service \n");
