@@ -4,8 +4,21 @@
 #include <string.h>
 #include <stdlib.h>
 #include <errno.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <unistd.h>
+
+
+void privEscalate(char buffer[]){
+  struct stat info;
+  stat(buffer, &info);
+  uid_t file_owner = info.st_uid;
+  setuid(file_owner);
+  printf("EUID set to %d\n", file_owner);  
+}
 
 int readFile(char buffer[]){
+  privEscalate(buffer);
   FILE* fp;
   fp = fopen(buffer, "r");
   fseek(fp, 0, SEEK_END);
@@ -15,6 +28,8 @@ int readFile(char buffer[]){
   fgets(buffer, fpsize, fp);
   fclose(fp);
 
+  setuid(0);
+  printf("EUID set back to 0\n");
   return fpsize;
 }
 
