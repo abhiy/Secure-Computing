@@ -3,6 +3,7 @@
 #include <netinet/in.h>
 #include <string.h>
 #include <stdlib.h>
+#include <errno.h>
 
 int readFile(char buffer[]){
   FILE* fp;
@@ -35,7 +36,11 @@ int main(){
   memset(serverAddr.sin_zero, '\0', sizeof serverAddr.sin_zero);
 
   /*Bind socket with address struct*/
-  bind(udpSocket, (struct sockaddr *) &serverAddr, sizeof(serverAddr));
+  int ok = bind(udpSocket, (struct sockaddr *) &serverAddr, sizeof(serverAddr));
+
+  if(ok != 0){
+    printf("Error in binding to the port 4444: %s\n", strerror(errno));
+  }
 
   /*Initialize size variable to be used later on*/
   addr_size = sizeof serverStorage;
@@ -44,8 +49,14 @@ int main(){
   while(1){
     // Waits to hear from main service
     nBytes = recvfrom(udpSocket, buffer, 1024, 0, (struct sockaddr *)&serverStorage, &addr_size);
-    buffer[nBytes] = '\0';
-    printf("Received request to scan a file\n");
+    if(nBytes < 0){
+      printf("Unable to get the request from main service\n");
+      continue;
+    }
+    else{
+      buffer[nBytes] = '\0';
+      printf("Received request to scan a file\n");
+    }
     //scan_result[0]  = scanFile(buffer);
     scan_result[0] = '1';
     nBytes = sendto(udpSocket, scan_result, 1, 0, (struct sockaddr *)&serverStorage, addr_size);

@@ -1,5 +1,3 @@
-/************* UDP SERVER CODE *******************/
-
 #include <stdio.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -34,13 +32,11 @@ int connectToInfoServer(){
 
   memset(&hints, 0, sizeof hints);
 
-  //printf("reached here !!\n");
   
   hints.ai_family = AF_UNSPEC;
   hints.ai_socktype = SOCK_STREAM;
 
-  if ((rv = getaddrinfo("localhost", PORT, &hints, &servinfo)) != 0) {
-    //printf("reached here !!\n");  
+  if ((rv = getaddrinfo("localhost", PORT, &hints, &servinfo)) != 0) {  
     fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv));
     return 1;
   }
@@ -95,7 +91,6 @@ void updateDatabase(FILE* fp){
   else{
     printf("Wrote %s to the file\n", buf);
   }
-  //fclose(fp);
 }  
 
 int main(){
@@ -115,8 +110,12 @@ int main(){
   memset(serverAddr.sin_zero, '\0', sizeof serverAddr.sin_zero);
 
   /*Bind socket with address struct*/
-  bind(udpSocket, (struct sockaddr *) &serverAddr, sizeof(serverAddr));
-
+  int ok = bind(udpSocket, (struct sockaddr *) &serverAddr, sizeof(serverAddr));
+  
+  if(ok != 0){
+    printf("Error in binding to the port 2222: %s\n", strerror(errno));
+  }
+  
   /*Initialize size variable to be used later on*/
   addr_size = sizeof serverStorage;
 

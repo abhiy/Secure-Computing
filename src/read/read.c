@@ -3,6 +3,7 @@
 #include <netinet/in.h>
 #include <string.h>
 #include <stdlib.h>
+#include <errno.h>
 
 int readFile(char buffer[]){
   FILE* fp;
@@ -35,7 +36,11 @@ int main(){
   memset(serverAddr.sin_zero, '\0', sizeof serverAddr.sin_zero);
 
   /*Bind socket with address struct*/
-  bind(udpSocket, (struct sockaddr *) &serverAddr, sizeof(serverAddr));
+  int ok = bind(udpSocket, (struct sockaddr *) &serverAddr, sizeof(serverAddr));
+
+  if(ok != 0){
+    printf("Error in binding to the port 3333: %s\n", strerror(errno));
+  }
 
   /*Initialize size variable to be used later on*/
   addr_size = sizeof serverStorage;
