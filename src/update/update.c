@@ -120,9 +120,10 @@ int main(){
   addr_size = sizeof serverStorage;
 
   FILE* fp;
-  fp = fopen("../../db/threat", "a");
-  if(fp == NULL)
-    printf("Can't open the threat file");
+  fp = fopen("/home/aby/Sem-1/Security/hw-2/Project/db/threat", "a");
+  if(fp == NULL){
+    printf("Error in opening the virus signature file: %s\n", strerror(errno));
+  }
   
   while(1){
     /* Try to receive any incoming UDP datagram. Address and port of 
