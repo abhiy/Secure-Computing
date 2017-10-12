@@ -10,6 +10,7 @@
 #include <sys/types.h>
 #include <arpa/inet.h>
 #include <fcntl.h>
+#include <seccomp.h>
 
 #define MAXDATASIZE 5
 #define PORT "3490"
@@ -114,6 +115,7 @@ int main(){
   
   if(ok != 0){
     printf("Error in binding to the port 2222: %s\n", strerror(errno));
+    exit(0);
   }
   
   /*Initialize size variable to be used later on*/
@@ -123,8 +125,42 @@ int main(){
   fp = fopen("/home/aby/Sem-1/Security/hw-2/Project/db/threat", "a");
   if(fp == NULL){
     printf("Error in opening the virus signature file: %s\n", strerror(errno));
+    exit(0);
   }
+  int fd = fileno(fp);
   
+  scmp_filter_ctx ctx;
+  ctx = seccomp_init(SCMP_ACT_KILL);
+
+  // Creating a whitelist
+  //seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(recvfrom), 1, SCMP_A0(SCMP_CMP_EQ, udpSocket));
+  seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(sendto), 1, SCMP_A0(SCMP_CMP_EQ, udpSocket));
+  seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(write), 1, SCMP_A0(SCMP_CMP_EQ, 1));
+
+  //seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(fstat), 1, SCMP_A0(SCMP_CMP_EQ, fd));
+  //seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(fstat), 1, SCMP_A0(SCMP_CMP_EQ, 1));
+
+  //seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(read), 1, SCMP_A0(SCMP_CMP_EQ, fd));
+  seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(lseek), 1, SCMP_A0(SCMP_CMP_EQ, fd));
+
+  // Need to be more permissive to allow connection over IP sockets :(
+  seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(socket), 0);
+  seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(connect), 0);
+  seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(close), 0);
+  seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(open), 1, SCMP_A1(SCMP_CMP_EQ, O_RDONLY|O_CLOEXEC));                                                         
+  seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(read), 0);
+  seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(fstat), 0);
+  seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(close), 0);
+  seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(getpid), 0);
+  seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(mmap), 0);
+  seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(mprotect), 0);
+  seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(munmap), 0);
+  seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(access), 0);
+  seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(recvfrom), 0);
+  seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(stat), 0);
+
+
+  seccomp_load(ctx);
   while(1){
     /* Try to receive any incoming UDP datagram. Address and port of 
        requesting client will be stored on serverStorage variable */
@@ -134,6 +170,6 @@ int main(){
     updateDatabase(fp);
     sendto(udpSocket, "Update Completed", 17, 0, (struct sockaddr *)&serverStorage, addr_size);
   }
-
+  seccomp_release(ctx);
   return 0;
 }
