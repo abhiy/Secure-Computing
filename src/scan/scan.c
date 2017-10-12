@@ -69,15 +69,16 @@ int main(){
   addr_size = sizeof serverStorage;
   char scan_result[1];
 
-  scmp_filter_ctx ctx;
-  ctx = seccomp_init(SCMP_ACT_KILL);
-
   FILE* fp;
   fp = fopen("/home/aby/Sem-1/Security/hw-2/Project/db/threat", "r");
   int fd = fileno(fp);
 
+  scmp_filter_ctx ctx;
+  ctx = seccomp_init(SCMP_ACT_KILL);
+
   // Creating a whitelist
   seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(recvfrom), 1, SCMP_A0(SCMP_CMP_EQ, udpSocket));
+  seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(sendto), 1, SCMP_A0(SCMP_CMP_EQ, udpSocket));
   seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(write), 1, SCMP_A0(SCMP_CMP_EQ, 1));
 
   seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(open), 2, SCMP_A0(SCMP_CMP_EQ, fd),
@@ -88,8 +89,6 @@ int main(){
 
   seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(read), 1, SCMP_A0(SCMP_CMP_EQ, fd));
   seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(lseek), 1, SCMP_A0(SCMP_CMP_EQ, fd));
-  seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(sendto), 1, SCMP_A0(SCMP_CMP_EQ, udpSocket));
-
 
   seccomp_load(ctx);
   while(1){
@@ -115,7 +114,7 @@ int main(){
     }
   }
   seccomp_release(ctx);
-  
+
   fclose(fp);
   return 0;
 }
