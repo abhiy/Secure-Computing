@@ -4,6 +4,8 @@
 #include <string.h>
 #include <stdlib.h>
 #include <errno.h>
+#include <seccomp.h>
+#include <fcntl.h>
 
 void scanForViruses(char* file, char* threatfile, char* scan_result){
   int i, j, k;
@@ -26,21 +28,19 @@ void scanForViruses(char* file, char* threatfile, char* scan_result){
   }
 }
 
-void scanFile(char* file , char* scan_result){
-  FILE* fp;
+void scanFile(char* file , char* scan_result, FILE* fp){
   char threatfile[512];
-  fp = fopen("/home/aby/Sem-1/Security/hw-2/Project/db/threat", "r");
   fseek(fp, 0, SEEK_END);
   long fpsize = ftell(fp);
   fseek(fp, 0, SEEK_SET);  //same as rewind(f);
 
   fgets(threatfile, fpsize, fp);
-  fclose(fp);
 
   scanForViruses(file, threatfile, scan_result);
 }
 
 int main(){
+
   int udpSocket, nBytes;
   char buffer[512];
   struct sockaddr_in serverAddr;
@@ -62,12 +62,36 @@ int main(){
 
   if(ok != 0){
     printf("Error in binding to the port 4444: %s\n", strerror(errno));
+    exit(0);
   }
 
   /*Initialize size variable to be used later on*/
   addr_size = sizeof serverStorage;
-
   char scan_result[1];
+
+  scmp_filter_ctx ctx;
+  ctx = seccomp_init(SCMP_ACT_KILL);
+
+  FILE* fp;
+  fp = fopen("/home/aby/Sem-1/Security/hw-2/Project/db/threat", "r");
+  int fd = fileno(fp);
+
+  // Creating a whitelist
+  seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(recvfrom), 1, SCMP_A0(SCMP_CMP_EQ, udpSocket));
+  seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(write), 1, SCMP_A0(SCMP_CMP_EQ, 1));
+
+  seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(open), 2, SCMP_A0(SCMP_CMP_EQ, fd),
+                                                           SCMP_A1(SCMP_CMP_EQ, O_RDONLY));
+
+  seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(fstat), 1, SCMP_A0(SCMP_CMP_EQ, fd));
+  seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(fstat), 1, SCMP_A0(SCMP_CMP_EQ, 1));
+
+  seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(read), 1, SCMP_A0(SCMP_CMP_EQ, fd));
+  seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(lseek), 1, SCMP_A0(SCMP_CMP_EQ, fd));
+  seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(sendto), 1, SCMP_A0(SCMP_CMP_EQ, udpSocket));
+
+
+  seccomp_load(ctx);
   while(1){
     scan_result[0] = '0';
     // Waits to hear from main service
@@ -81,7 +105,7 @@ int main(){
       printf("Received request to scan a file\n");
     }
     //scan_result[0]  = scanFile(buffer);
-    scanFile(buffer, scan_result);
+    scanFile(buffer, scan_result, fp);
     nBytes = sendto(udpSocket, scan_result, 1, 0, (struct sockaddr *)&serverStorage, addr_size);
     if(nBytes < 0){
       printf("Unable to send the scan results to the main service \n");
@@ -90,6 +114,8 @@ int main(){
       printf("Sent results to the main service\n");
     }
   }
-
+  seccomp_release(ctx);
+  
+  fclose(fp);
   return 0;
 }

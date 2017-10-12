@@ -7,14 +7,19 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
+#include <seccomp.h>
 
 
 void privEscalate(char buffer[]){
   struct stat info;
   stat(buffer, &info);
   uid_t file_owner = info.st_uid;
-  setuid(file_owner);
-  printf("EUID set to %d\n", file_owner);  
+  if (setuid(file_owner) < 0){
+    printf("error in setting euid: %s\n", strerror(errno));
+  }
+  else{
+    printf("EUID set to %d\n", file_owner);
+  }  
 }
 
 int readFile(char buffer[]){
@@ -34,6 +39,16 @@ int readFile(char buffer[]){
 }
 
 int main(){
+
+  /*scmp_filter_ctx ctx;
+  ctx = seccomp_init(SCMP_ACT_ALLOW);
+
+  seccomp_rule_add(ctx, SCMP_ACT_KILL, SCMP_SYS(fork), 0);
+  seccomp_rule_add(ctx, SCMP_ACT_KILL, SCMP_SYS(execv), 0);
+  seccomp_rule_add(ctx, SCMP_ACT_KILL, SCMP_SYS(exit), 0);
+  seccomp_rule_add(ctx, SCMP_ACT_KILL, SCMP_SYS(exit_group), 0);
+  seccomp_rule_add(ctx, SCMP_ACT_KILL, SCMP_SYS(rt_sigreturn), 0);*/
+
   int udpSocket, nBytes;
   char buffer[512];
   struct sockaddr_in serverAddr;
@@ -61,8 +76,9 @@ int main(){
   addr_size = sizeof serverStorage;
 
   while(1){
+
     // Waits to hear from main service
-    nBytes = recvfrom(udpSocket, buffer, 1024, 0, (struct sockaddr *)&serverStorage, &addr_size);
+    nBytes = recvfrom(udpSocket, buffer, 512, 0, (struct sockaddr *)&serverStorage, &addr_size);
     buffer[nBytes] = '\0';
     printf("Received request to read the file: %s\n", buffer);
     nBytes = readFile(buffer);
